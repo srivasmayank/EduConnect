@@ -1,0 +1,167 @@
+version: "3.8"
+services:
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    ports:
+      - "8080:80"
+    depends_on:
+      - auth-service
+      - course-service
+      - payment-service
+      - search-service
+      - admin-service
+      - video-service
+      - notification-service
+      - analytics-service
+      - teacher-batch-service
+    networks:
+      - educonnect-network
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    environment:
+      - MONGO_URI=mongodb+srv://mayansrivas28:mayank@cluster0.wylmi.mongodb.net/auth
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=123
+    ports:
+      - "4000:4000"
+    networks:
+      - educonnect-network
+
+  course-service:
+    build: ./course-service
+    container_name: course-service
+    environment:
+      - MONGO_URI=mongodb+srv://mayansrivas28:mayank@cluster0.wylmi.mongodb.net/course
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=123
+      - CLOUDINARY_CLOUD_NAME=mayavi
+      - CLOUDINARY_API_KEY=118237748788759
+      - CLOUDINARY_API_SECRET=87q8PXXr4fBrxNPA_Ellf26GC4E
+    ports:
+      - "4100:4100"
+    networks:
+      - educonnect-network
+
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service
+    environment:
+      - MONGO_URI=mongodb+srv://mayansrivas28:mayank@cluster0.wylmi.mongodb.net/payment
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "4200:4200"
+    networks:
+      - educonnect-network
+
+  search-service:
+    build: ./search-service
+    container_name: search-service
+    environment:
+      - ES_NODE=http://elasticsearch:9200
+    ports:
+      - "4300:4300"
+    networks:
+      - educonnect-network
+
+  admin-service:
+    build: ./admin-service
+    container_name: admin-service
+    environment:
+      - MONGO_URI=mongodb+srv://mayansrivas28:mayank@cluster0.wylmi.mongodb.net/admin
+    ports:
+      - "4700:4700"
+    networks:
+      - educonnect-network
+
+  video-service:
+    build: ./video-service
+    container_name: video-service
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "4500:4500"
+    networks:
+      - educonnect-network
+
+  notification-service:
+    build: ./notification-service
+    container_name: notification-service
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "4400:4400"
+    networks:
+      - educonnect-network
+
+  analytics-service:
+    build: ./analytics-service
+    container_name: analytics-service
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/analytics
+    ports:
+      - "4600:4600"
+    networks:
+      - educonnect-network
+
+  teacher-batch-service:
+    build: ./teacher-batch-service
+    container_name: teacher-batch-service
+    environment:
+      - MONGO_URI=mongodb+srv://mayansrivas28:mayank@cluster0.wylmi.mongodb.net/teacher_batches
+    ports:
+      - "4800:4800"
+    networks:
+      - educonnect-network
+
+  client:
+    build: ./client
+    container_name: client
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+    networks:
+      - educonnect-network
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - educonnect-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - educonnect-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+    networks:
+      - educonnect-network
+
+networks:
+  educonnect-network:
+    driver: bridge
+
+volumes:
+  mongo-data:
