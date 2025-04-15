@@ -41,7 +41,7 @@ function CoursePage() {
     return <div className="p-8">Loading course details...</div>;
   }
 
-  if (course.access === 'demo') {
+  if (false) {
     return (
       <div className="p-8">
         <h2 className="text-3xl font-semibold mb-4">{course.title}</h2>

@@ -158,6 +158,8 @@ services:
       - "9200:9200"
     networks:
       - educonnect-network
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
 
 networks:
   educonnect-network:
@@ -165,3 +167,4 @@ networks:
 
 volumes:
   mongo-data:
+  es-data: 
