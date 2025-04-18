@@ -74,7 +74,7 @@ const ProgressSchema = new mongoose.Schema({
   userId: String,
   courseId: String,
   lectureId: String,
-  time: Number,           // seconds watched
+  time: Number,           
   updated: { type: Date, default: Date.now }
 });
 const Progress = mongoose.model('Progress', ProgressSchema);
