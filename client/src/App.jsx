@@ -29,6 +29,7 @@ import MonitorTransactionsPage from './pages/MonitorTransactionsPage';
 
 // Payment page
 import PaymentPage from './pages/PaymentPage';
+import ManageLecturesPage from './pages/ManageLecturesPage';
 
 function App() {
   const isAuthenticated = !!localStorage.getItem('token');
@@ -60,6 +61,7 @@ function App() {
             <Route path="/teacher/create-course" element={<CreateCoursePage />} />
             <Route path="/teacher/batch-management" element={<BatchManagementPage />} />
             <Route path="/teacher/earnings" element={<EarningsPage />} />
+            <Route path="/courses/:courseId/manage" element={<ManageLecturesPage />} />
           </Route>
 
           {/* Admin Protected Routes */}

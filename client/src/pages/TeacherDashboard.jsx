@@ -81,7 +81,7 @@ function TeacherDashboard() {
         {courses.length === 0 ? (
           <p>No courses found. Create a new course!</p>
         ) : (
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
             {courses.map(course => (
               <div key={course._id} className="border rounded shadow p-4">
                 <img 

@@ -14,7 +14,7 @@ function CourseListingPage() {
   return (
     <div className="p-8">
       <h2 className="text-3xl font-semibold mb-4">All Courses</h2>
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         {courses.map(course => (
           <div key={course._id} className="border rounded shadow p-4">
             <img src={course.thumbnail || "https://via.placeholder.com/300x200"} alt="Course Thumbnail" className="w-full h-40 object-cover rounded" />

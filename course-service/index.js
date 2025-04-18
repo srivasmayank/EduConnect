@@ -70,6 +70,160 @@ const EnrollmentSchema = new mongoose.Schema({
 });
 const Enrollment = mongoose.model('Enrollment', EnrollmentSchema);
 
+const ProgressSchema = new mongoose.Schema({
+  userId: String,
+  courseId: String,
+  lectureId: String,
+  time: Number,           // seconds watched
+  updated: { type: Date, default: Date.now }
+});
+const Progress = mongoose.model('Progress', ProgressSchema);
+
+function requireAuth(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.userId = decoded.id;
+    next();
+  } catch (err) {
+    console.error('JWT verification error:', err);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+
+app.get('/courses/:courseId/progress', requireAuth, async (req, res) => {
+  const { courseId } = req.params;
+  const userId = req.userId;
+  try {
+    const docs = await Progress.find({ userId, courseId });
+    res.json(docs);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch progress' });
+  }
+});
+
+// Update progress for one lecture (upsert)
+app.post(
+  '/courses/:courseId/lectures/:lectureId/progress',
+  requireAuth,
+  express.json(),
+  async (req, res) => {
+    const { courseId, lectureId } = req.params;
+    const userId = req.userId;
+    const { time } = req.body; // in seconds
+    if (typeof time !== 'number') {
+      return res.status(400).json({ error: 'time (Number) is required' });
+    }
+    try {
+      const doc = await Progress.findOneAndUpdate(
+        { userId, courseId, lectureId },
+        { time, updated: new Date() },
+        { upsert: true, new: true }
+      );
+      res.json(doc);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not save progress' });
+    }
+  }
+);
+// in your Express app, alongside your video upload route:
+app.post(
+  '/courses/upload-image',
+  upload.single('image'),              // multer key: “image”
+  async (req, res) => {
+    try {
+      const result = await cloudinary.uploader.upload(
+        req.file.path,
+        {
+          resource_type: 'image',       // tell Cloudinary it’s an image
+          folder: 'courses/thumbnails'  // optional: separate folder
+        }
+      );
+      res.json({ imageUrl: result.secure_url });
+    } catch (error) {
+      console.error('Cloudinary image upload error:', error);
+      res.status(500).json({ error: 'Image upload failed' });
+    }
+  }
+);
+
+// Multer is already configured as `upload`
+
+// 1️⃣ Add a lecture (with title & video file)
+app.post(
+  '/courses/:courseId/lectures',
+  upload.single('video'),
+  async (req, res) => {
+    try {
+      const { title } = req.body;
+      if (!title || !req.file) {
+        return res.status(400).json({ error: 'Title and video file required' });
+      }
+      // 1. upload video to Cloudinary
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: 'video',
+        folder: 'courses/lectures'
+      });
+      // 2. push new lecture into course
+      const course = await Course.findById(req.params.courseId);
+      course.lectures.push({ title, videoUrl: result.secure_url, thumbnail: '' });
+      await course.save();
+      res.status(201).json({ lectures: course.lectures });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not add lecture' });
+    }
+  }
+);
+
+// 2️⃣ Delete a lecture
+app.delete('/courses/:courseId/lectures/:lectureId', async (req, res) => {
+  try {
+    const { courseId, lectureId } = req.params;
+    const course = await Course.findById(courseId);
+    course.lectures = course.lectures.filter(l => l._id.toString() !== lectureId);
+    await course.save();
+    res.json({ lectures: course.lectures });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not delete lecture' });
+  }
+});
+
+// 3️⃣ Update a lecture’s title or replace its video
+app.put(
+  '/courses/:courseId/lectures/:lectureId',
+  upload.single('video'), // optional, only if replacing
+  async (req, res) => {
+    try {
+      const { title } = req.body;
+      const { courseId, lectureId } = req.params;
+      const course = await Course.findById(courseId);
+      const lec = course.lectures.id(lectureId);
+      if (!lec) return res.status(404).json({ error: 'Lecture not found' });
+
+      if (title) lec.title = title;
+      if (req.file) {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: 'video',
+          folder: 'courses/lectures'
+        });
+        lec.videoUrl = result.secure_url;
+      }
+
+      await course.save();
+      res.json({ lectures: course.lectures });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not update lecture' });
+    }
+  }
+);
+
 // Endpoint: Upload video to Cloudinary (for full and demo videos)
 app.post('/courses/upload', upload.single('video'), async (req, res) => {
   try {
@@ -202,25 +356,35 @@ app.get('/courses', async (req, res) => {
 });
 
 // Get Single Course Details with Enrollment Check
+// Get Single Course Details with Enrollment Check
 app.get('/courses/:courseId', async (req, res) => {
   try {
     const course = await Course.findById(req.params.courseId);
+    console.log("cours",course);
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
     let access = 'demo';
-    const token = req.headers.authorization?.split(' ')[1];
-    if (token) {
+    const auth = req.headers.authorization?.split(' ')[1];
+    if (auth) {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const enrollment = await Enrollment.findOne({ studentId: decoded.id, courseId: course._id });
-        if (enrollment) {
+        const decoded = jwt.verify(auth, JWT_SECRET);
+        const userId = decoded.id;
+
+        // 1️⃣ Teacher sees full access on their own course:
+        console.log(course.teacherId,"idchk",userId)
+        if (userId === course.teacherId) {
           access = 'full';
+        } else {
+          // 2️⃣ Otherwise, check student enrollment:
+          const enrollment = await Enrollment.findOne({ studentId: userId, courseId: course._id });
+          if (enrollment) access = 'full';
         }
       } catch (err) {
         console.error('JWT verification error:', err);
       }
     }
 
+    // Return either full course or demo‐only fields
     if (access === 'full') {
       return res.json({ ...course.toObject(), access });
     } else {
@@ -238,5 +402,6 @@ app.get('/courses/:courseId', async (req, res) => {
     res.status(500).json({ error: 'Error fetching course details' });
   }
 });
+
 
 app.listen(PORT, () => console.log(`Course Service running on port ${PORT}`));

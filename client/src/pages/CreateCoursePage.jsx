@@ -1,171 +1,257 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import API from '../api';
 
+// Reusable Dropzone with preview and remove
+const Dropzone = ({
+  id,
+  accept,
+  previewSrc,
+  onFileChange,
+  uploading,
+  onUploadClick,
+  uploadLabel,
+  title,
+  hint,
+  onRemove
+}) => (
+  <div className="space-y-2">
+    <p className="block text-lg font-semibold">{title}</p>
+
+    {previewSrc ? (
+      <div className="relative w-full h-48 rounded-2xl overflow-hidden bg-gray-100">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute top-2 right-2 text-white bg-black bg-opacity-50 rounded-full w-6 h-6 flex items-center justify-center hover:bg-opacity-75"
+        >
+          &times;
+        </button>
+        {accept.startsWith('video') ? (
+          <video
+            src={previewSrc}
+            controls
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <img
+            src={previewSrc}
+            alt={`${title} preview`}
+            className="w-full h-full object-cover"
+          />
+        )}
+      </div>
+    ) : (
+      <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-2xl bg-white hover:bg-gray-50 transition-shadow shadow-sm hover:shadow-lg cursor-pointer">
+        <label htmlFor={id} className="flex flex-col items-center justify-center w-full h-full p-4">
+          <svg className="w-10 h-10 mb-3 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+          </svg>
+          <p className="text-sm text-gray-600"><span className="font-medium">Click to select</span> or drag and drop</p>
+          <p className="text-xs text-gray-500">{hint}</p>
+          <input
+            id={id}
+            type="file"
+            accept={accept}
+            className="hidden"
+            onChange={onFileChange}
+          />
+        </label>
+      </div>
+    )}
+
+    <button
+      type="button"
+      onClick={onUploadClick}
+      disabled={uploading || !previewSrc}
+      className={`w-full py-2 rounded-lg text-white transition-all duration-200 
+        ${uploading || !previewSrc
+          ? 'bg-gray-300 cursor-not-allowed'
+          : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'}`}
+    >
+      {uploading ? 'Uploading...' : uploadLabel}
+    </button>
+  </div>
+);
+
 function CreateCoursePage() {
-  // Retrieve teacherId from localStorage (set during login)
   const teacherId = localStorage.getItem('currentTeacherId');
-  
+
   const [courseData, setCourseData] = useState({
-    title: '',
-    description: '',
-    videoUrl: '',
-    demoVideoUrl: '',
-    thumbnail: '',
-    shortDescription: ''
+    title: '', description: '', videoUrl: '', demoVideoUrl: '', thumbnail: '', shortDescription: ''
   });
+
+  // Local file and preview states
   const [fullVideoFile, setFullVideoFile] = useState(null);
+  const [fullVideoPreview, setFullVideoPreview] = useState('');
+
   const [demoVideoFile, setDemoVideoFile] = useState(null);
+  const [demoVideoPreview, setDemoVideoPreview] = useState('');
+
+  const [thumbnailFile, setThumbnailFile] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState('');
+
   const [uploadingFull, setUploadingFull] = useState(false);
   const [uploadingDemo, setUploadingDemo] = useState(false);
+  const [uploadingThumb, setUploadingThumb] = useState(false);
 
-  const handleFullVideoFileChange = (e) => {
-    setFullVideoFile(e.target.files[0]);
-  };
+  // Generate previews when files are selected
+  useEffect(() => {
+    if (fullVideoFile) {
+      const url = URL.createObjectURL(fullVideoFile);
+      setFullVideoPreview(url);
+      return () => URL.revokeObjectURL(url);
+    } else setFullVideoPreview('');
+  }, [fullVideoFile]);
 
-  const handleDemoVideoFileChange = (e) => {
-    setDemoVideoFile(e.target.files[0]);
-  };
+  useEffect(() => {
+    if (demoVideoFile) {
+      const url = URL.createObjectURL(demoVideoFile);
+      setDemoVideoPreview(url);
+      return () => URL.revokeObjectURL(url);
+    } else setDemoVideoPreview('');
+  }, [demoVideoFile]);
 
-  const uploadVideo = async (file) => {
+  useEffect(() => {
+    if (thumbnailFile) {
+      const url = URL.createObjectURL(thumbnailFile);
+      setThumbnailPreview(url);
+      return () => URL.revokeObjectURL(url);
+    } else setThumbnailPreview('');
+  }, [thumbnailFile]);
+
+  const uploadFile = async (file, endpoint, fieldName) => {
     const formData = new FormData();
-    formData.append("video", file);
-    try {
-      const res = await API.post('/courses/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      return res.data.videoUrl;
-    } catch (error) {
-      console.error('Error uploading video:', error);
-      throw error;
-    }
+    formData.append(fieldName, file);
+    const res = await API.post(endpoint, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return res.data[Object.keys(res.data)[0]];
   };
+
+  const handleFullVideoFileChange = e => setFullVideoFile(e.target.files[0]);
+  const handleDemoVideoFileChange = e => setDemoVideoFile(e.target.files[0]);
+  const handleThumbnailFileChange = e => setThumbnailFile(e.target.files[0]);
 
   const handleFullVideoUpload = async () => {
-    if (!fullVideoFile) {
-      alert('Please select a full course video file to upload.');
-      return;
-    }
     setUploadingFull(true);
     try {
-      const url = await uploadVideo(fullVideoFile);
-      setCourseData({ ...courseData, videoUrl: url });
-      alert('Full course video uploaded successfully!');
-    } catch (error) {
-      alert('Full video upload failed');
-    } finally {
-      setUploadingFull(false);
-    }
+      const url = await uploadFile(fullVideoFile, '/courses/upload', 'video');
+      setCourseData(cd => ({ ...cd, videoUrl: url }));
+      setFullVideoFile(null); setFullVideoPreview('');
+    } catch (err) { console.error(err); alert('Full video upload failed.'); }
+    finally { setUploadingFull(false); }
   };
 
   const handleDemoVideoUpload = async () => {
-    if (!demoVideoFile) {
-      alert('Please select a demo video file to upload.');
-      return;
-    }
     setUploadingDemo(true);
     try {
-      const url = await uploadVideo(demoVideoFile);
-      setCourseData({ ...courseData, demoVideoUrl: url });
-      alert('Demo video uploaded successfully!');
-    } catch (error) {
-      alert('Demo video upload failed');
-    } finally {
-      setUploadingDemo(false);
-    }
+      const url = await uploadFile(demoVideoFile, '/courses/upload', 'video');
+      setCourseData(cd => ({ ...cd, demoVideoUrl: url }));
+      setDemoVideoFile(null); setDemoVideoPreview('');
+    } catch (err) { console.error(err); alert('Demo video upload failed.'); }
+    finally { setUploadingDemo(false); }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!teacherId) {
-      alert('Teacher ID not found. Please log in as a teacher.');
-      return;
-    }
+  const handleThumbnailUpload = async () => {
+    setUploadingThumb(true);
     try {
-      // Include the teacherId retrieved from localStorage in the payload
-      const res = await API.post('/courses', { ...courseData, teacherId });
-      alert('Course created and video queued for processing!');
-      setCourseData({
-        title: '',
-        description: '',
-        videoUrl: '',
-        demoVideoUrl: '',
-        thumbnail: '',
-        shortDescription: ''
-      });
-      setFullVideoFile(null);
-      setDemoVideoFile(null);
-    } catch (error) {
-      console.error('Error creating course:', error);
-      alert('Error creating course');
-    }
+      const url = await uploadFile(thumbnailFile, '/courses/upload-image', 'image');
+      setCourseData(cd => ({ ...cd, thumbnail: url }));
+      setThumbnailFile(null); setThumbnailPreview('');
+    } catch (err) { console.error(err); alert('Thumbnail upload failed.'); }
+    finally { setUploadingThumb(false); }
+  };
+
+  const removeFullVideo = () => { setFullVideoFile(null); setFullVideoPreview(''); };
+  const removeDemoVideo = () => { setDemoVideoFile(null); setDemoVideoPreview(''); };
+  const removeThumbnail = () => { setThumbnailFile(null); setThumbnailPreview(''); };
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    if (!teacherId) return alert('Please log in as teacher!');
+    try {
+      await API.post('/courses', { ...courseData, teacherId });
+      alert('Course created!');
+      setCourseData({ title: '', description: '', videoUrl: '', demoVideoUrl: '', thumbnail: '', shortDescription: '' });
+    } catch (err) { console.error(err); alert('Error creating course.'); }
   };
 
   return (
-    <div className="max-w-lg mx-auto p-8">
-      <h2 className="text-3xl font-semibold mb-4">Create Course</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input 
+    <div className="max-w-xl mx-auto p-8 bg-gray-50 rounded-2xl shadow-md">
+      <h2 className="text-4xl font-bold mb-6 text-center">Create New Course</h2>
+      <form onSubmit={handleSubmit} className="space-y-6">
+
+        <input
           type="text"
           placeholder="Course Title"
-          className="w-full p-2 border rounded"
+          className="w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           value={courseData.title}
           onChange={e => setCourseData({ ...courseData, title: e.target.value })}
           required
         />
-        <textarea 
+
+        <textarea
           placeholder="Course Description"
-          className="w-full p-2 border rounded"
+          className="w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 h-32"
           value={courseData.description}
           onChange={e => setCourseData({ ...courseData, description: e.target.value })}
           required
         />
-        {/* Full Course Video Upload */}
-        <div className="space-y-2">
-          <label className="block font-bold">Upload Full Course Video</label>
-          <input type="file" onChange={handleFullVideoFileChange} accept="video/*" />
-          <button 
-            type="button" 
-            onClick={handleFullVideoUpload} 
-            className="bg-blue-500 text-white px-4 py-2 rounded" 
-            disabled={uploadingFull}
-          >
-            {uploadingFull ? 'Uploading...' : 'Upload Full Video'}
-          </button>
-          {courseData.videoUrl && (
-            <p className="text-green-600">Full video uploaded successfully.</p>
-          )}
-        </div>
-        {/* Demo Video Upload */}
-        <div className="space-y-2">
-          <label className="block font-bold">Upload Demo Video</label>
-          <input type="file" onChange={handleDemoVideoFileChange} accept="video/*" />
-          <button 
-            type="button" 
-            onClick={handleDemoVideoUpload} 
-            className="bg-blue-500 text-white px-4 py-2 rounded" 
-            disabled={uploadingDemo}
-          >
-            {uploadingDemo ? 'Uploading...' : 'Upload Demo Video'}
-          </button>
-          {courseData.demoVideoUrl && (
-            <p className="text-green-600">Demo video uploaded successfully.</p>
-          )}
-        </div>
-        <input 
-          type="text"
-          placeholder="Thumbnail URL"
-          className="w-full p-2 border rounded"
-          value={courseData.thumbnail}
-          onChange={e => setCourseData({ ...courseData, thumbnail: e.target.value })}
+
+        {/* Full Video Dropzone */}
+        {/* <Dropzone
+          id="full-video"
+          accept="video/*"
+          previewSrc={fullVideoPreview}
+          onFileChange={handleFullVideoFileChange}
+          uploading={uploadingFull}
+          onUploadClick={handleFullVideoUpload}
+          uploadLabel="Upload Full Video"
+          title="Full Course Video"
+          hint="MP4, MOV (max 500MB)"
+          onRemove={removeFullVideo}
+        /> */}
+
+        {/* Demo Video Dropzone */}
+        <Dropzone
+          id="demo-video"
+          accept="video/*"
+          previewSrc={demoVideoPreview}
+          onFileChange={handleDemoVideoFileChange}
+          uploading={uploadingDemo}
+          onUploadClick={handleDemoVideoUpload}
+          uploadLabel="Upload Demo Video"
+          title="Demo Video"
+          hint="MP4, MOV (max 100MB)"
+          onRemove={removeDemoVideo}
         />
-        <input 
+
+        {/* Thumbnail Dropzone */}
+        <Dropzone
+          id="thumbnail"
+          accept="image/*"
+          previewSrc={thumbnailPreview}
+          onFileChange={handleThumbnailFileChange}
+          uploading={uploadingThumb}
+          onUploadClick={handleThumbnailUpload}
+          uploadLabel="Upload Thumbnail"
+          title="Course Thumbnail"
+          hint="PNG, JPG (800x400px max)"
+          onRemove={removeThumbnail}
+        />
+
+        <input
           type="text"
           placeholder="Short Description"
-          className="w-full p-2 border rounded"
+          className="w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           value={courseData.shortDescription}
           onChange={e => setCourseData({ ...courseData, shortDescription: e.target.value })}
         />
-        <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded">Create Course</button>
+
+        <button
+          type="submit"
+          className="w-full py-3 bg-gradient-to-r from-green-500 to-green-600 text-white text-lg rounded-lg shadow-md hover:from-green-600 hover:to-green-700 transition-all duration-200"
+        >
+          Create Course
+        </button>
       </form>
     </div>
   );

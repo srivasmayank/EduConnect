@@ -19,6 +19,9 @@ function LoginPage() {
       if (data.role === 'teacher' && data.userId) {
         localStorage.setItem('currentTeacherId', data.userId);
       }
+      if (data.role === 'student' && data.userId) {
+        localStorage.setItem('userId', data.userId);
+      }
       console.log("mxk",data.role)
       // Navigate based on user role
       if (data.role === 'teacher') {

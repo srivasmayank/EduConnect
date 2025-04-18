@@ -58,8 +58,8 @@ app.post('/auth/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-    await redisClient.setEx(`session:${user._id}`, 3600, token);
+    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '2d' });
+    await redisClient.setEx(`session:${user._id}`, 172800, token);
     res.json({ token, role: user.role, userId: user._id });
   } catch (error) {
     console.error(error);
