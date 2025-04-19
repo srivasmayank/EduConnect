@@ -1,53 +1,102 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import API from '../api';
 
-function StudentDashboard() {
+export default function StudentDashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState({
     enrolledCourses: [],
     upcomingClasses: [],
     notifications: []
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    API.get('/dashboard/student')
-      .then(res => setData(res.data))
-      .catch(err => console.error('Error fetching dashboard data:', err));
-  }, []);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      // not logged in
+      navigate('/login');
+      return;
+    }
+    API.get('/dashboard/student', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => {
+        setData(res.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching dashboard data:', err);
+        setLoading(false);
+      });
+  }, [navigate]);
+
+  if (loading) return <div className="p-8">Loading dashboard…</div>;
 
   return (
-    <div className="p-8">
-      <h2 className="text-3xl font-semibold mb-4">Student Dashboard</h2>
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="p-4 border rounded">
-          <h3 className="font-bold mb-2">Enrolled Courses</h3>
-          <ul>
+    <div className="p-8 space-y-8">
+      <h2 className="text-3xl font-semibold">Student Dashboard</h2>
+
+      {/* Enrolled Courses */}
+      <section>
+        <h3 className="text-2xl font-bold mb-4">Your Enrolled Courses</h3>
+        {data.enrolledCourses.length === 0 ? (
+          <p>You haven’t enrolled in any courses yet.</p>
+        ) : (
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {data.enrolledCourses.map(course => (
-              <li key={course._id}>
-                <Link to={`/courses/${course._id}`} className="text-blue-500">{course.title}</Link>
+              <div key={course._id} className="border rounded shadow p-4 flex flex-col">
+                <img
+                  src={course.thumbnail || 'https://via.placeholder.com/300x200'}
+                  alt="Course thumbnail"
+                  className="w-full h-40 object-cover rounded mb-4"
+                />
+                <h4 className="font-bold text-lg">{course.title}</h4>
+                <p className="text-gray-600 flex-grow">{course.shortDescription}</p>
+                <p className="mt-2 text-sm">
+                  ⭐ {course.averageRating ? course.averageRating.toFixed(1) : 'No ratings yet'}
+                </p>
+                <Link
+                  to={`/courses/${course._id}`}
+                  className="mt-4 bg-blue-500 text-white text-center py-2 rounded hover:bg-blue-600"
+                >
+                  Go to Course
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Upcoming Classes (placeholder) */}
+      <section>
+        <h3 className="text-2xl font-bold mb-4">Upcoming Classes</h3>
+        {data.upcomingClasses.length === 0 ? (
+          <p>No upcoming classes scheduled.</p>
+        ) : (
+          <ul className="list-disc ml-6">
+            {data.upcomingClasses.map(cls => (
+              <li key={cls.id}>
+                {cls.title} on {cls.date}
               </li>
             ))}
           </ul>
-        </div>
-        <div className="p-4 border rounded">
-          <h3 className="font-bold mb-2">Upcoming Classes</h3>
-          <ul>
-            {data.upcomingClasses.map(cls => (
-              <li key={cls.id}>{cls.title} on {cls.date}</li>
+        )}
+      </section>
+
+      {/* Notifications (placeholder) */}
+      <section>
+        <h3 className="text-2xl font-bold mb-4">Notifications</h3>
+        {data.notifications.length === 0 ? (
+          <p>No new notifications.</p>
+        ) : (
+          <ul className="list-disc ml-6">
+            {data.notifications.map((note, idx) => (
+              <li key={idx}>{note}</li>
             ))}
           </ul>
-        </div>
-      </div>
-      <div className="mt-6 p-4 border rounded">
-        <h3 className="font-bold mb-2">Notifications</h3>
-        <ul>
-          {data.notifications.map((note, index) => (
-            <li key={index}>{note}</li>
-          ))}
-        </ul>
-      </div>
+        )}
+      </section>
     </div>
   );
 }
-
-export default StudentDashboard;

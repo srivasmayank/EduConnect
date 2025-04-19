@@ -92,6 +92,36 @@ function requireAuth(req, res, next) {
   }
 }
 
+// GET student dashboard data
+// at top, after requireAuth is defined
+// const requireAuth = …;
+
+// Student Dashboard: list enrolled courses + placeholder arrays
+app.get('/dashboard/student', requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    // 1️⃣ find all enrollments
+    const enrollments = await Enrollment.find({ studentId: userId });
+    const courseIds = enrollments.map(e => e.courseId);
+
+    // 2️⃣ load those courses
+    const courses = await Course.find({ _id: { $in: courseIds } });
+
+    // 3️⃣ placeholder upcomingClasses & notifications
+    const upcomingClasses = [];     // you can fill in real data later
+    const notifications = [];       // you can fill in real data later
+
+    res.json({
+      enrolledCourses: courses,
+      upcomingClasses,
+      notifications
+    });
+  } catch (err) {
+    console.error('Error in /dashboard/student:', err);
+    res.status(500).json({ error: 'Could not fetch student dashboard' });
+  }
+});
+
 
 app.get('/courses/:courseId/progress', requireAuth, async (req, res) => {
   const { courseId } = req.params;
